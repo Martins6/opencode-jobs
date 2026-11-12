@@ -1,0 +1,203 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  meta:
+    name: Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      is_tag: ${{ steps.meta.outputs.is_tag }}
+    steps:
+      - name: Resolve version
+        id: meta
+        env:
+          REF: ${{ github.ref }}
+          REF_NAME: ${{ github.ref_name }}
+          RUN_NUMBER: ${{ github.run_number }}
+          SHA: ${{ github.sha }}
+        run: |
+          if [[ "$REF" == refs/tags/v* ]]; then
+            version="${REF_NAME#v}"
+            is_tag=true
+            if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+              echo "Release tags must look like v0.1.0 or v0.1.0-rc.1" >&2
+              exit 1
+            fi
+          else
+            version="0.0.0-main.${RUN_NUMBER}+${SHA:0:7}"
+            is_tag=false
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "is_tag=$is_tag" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
+    needs: meta
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: darwin
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: linux
+            goarch: amd64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          VERSION: ${{ needs.meta.outputs.version }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          mkdir -p package dist
+          build_date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          CGO_ENABLED=0 go build -trimpath \
+            -ldflags="-s -w \
+              -X github.com/Martins6/opencode-jobs/internal/version.Version=${VERSION} \
+              -X github.com/Martins6/opencode-jobs/internal/version.Commit=${COMMIT} \
+              -X github.com/Martins6/opencode-jobs/internal/version.Date=${build_date}" \
+            -o package/opencode-jobs .
+          tar -czf "dist/opencode-jobs_${GOOS}_${GOARCH}.tar.gz" -C package opencode-jobs
+          ls -lh "dist/opencode-jobs_${GOOS}_${GOARCH}.tar.gz"
+
+      - name: Smoke test
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+        run: |
+          ./package/opencode-jobs version
+          ./package/opencode-jobs help | grep -q "Usage:"
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: opencode-jobs_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  publish:
+    name: Publish
+    needs: [meta, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download builds
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Checksums
+        run: |
+          cd artifacts
+          sha256sum opencode-jobs_*.tar.gz | sort -k2 > checksums.txt
+          cat checksums.txt
+          test "$(wc -l < checksums.txt | tr -d ' ')" -eq 4
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: artifacts/*
+          if-no-files-found: error
+
+      - name: Publish rolling main build
+        if: needs.meta.outputs.is_tag == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: Martins6/opencode-jobs
+          VERSION: ${{ needs.meta.outputs.version }}
+        run: |
+          tag="latest"
+          notes="Rolling build from main at ${GITHUB_SHA} (version ${VERSION})."
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" artifacts/* --clobber
+            gh release edit "$tag" --title "Latest main build" --notes "$notes" --prerelease
+          else
+            gh release create "$tag" artifacts/* --title "Latest main build" --notes "$notes" --prerelease
+          fi
+
+      - name: Publish versioned release
+        if: needs.meta.outputs.is_tag == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: Martins6/opencode-jobs
+          TAG: ${{ github.ref_name }}
+        run: |
+          release_args=()
+          if [[ "$TAG" == *-* ]]; then
+            release_args+=(--prerelease)
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" artifacts/* --clobber
+            gh release edit "$TAG" --draft=false "${release_args[@]}"
+          else
+            gh release create "$TAG" artifacts/* --title "$TAG" --generate-notes "${release_args[@]}"
+          fi
+
+  homebrew:
+    name: Update Homebrew tap
+    needs: [meta, publish]
+    if: needs.meta.outputs.is_tag == 'true' && !contains(github.ref_name, '-')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          name: release-assets
+          path: release
+
+      - name: Generate formula
+        run: |
+          scripts/generate-homebrew-formula.sh \
+            "${{ github.ref_name }}" \
+            release/checksums.txt \
+            "$RUNNER_TEMP/opencode-jobs.rb"
+
+      - name: Push formula to tap
+        env:
+          TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::warning::HOMEBREW_TAP_TOKEN is not set; skipping the tap update."
+            exit 0
+          fi
+          git clone "https://x-access-token:${TOKEN}@github.com/Martins6/homebrew-tap.git" tap
+          cp "$RUNNER_TEMP/opencode-jobs.rb" tap/Formula/opencode-jobs.rb
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/opencode-jobs.rb
+          if git diff --cached --quiet; then
+            echo "Formula is already up to date."
+            exit 0
+          fi
+          git commit -m "opencode-jobs ${{ github.ref_name }}"
+          git push origin HEAD:main
