@@ -25,8 +25,8 @@ brew install opencode-jobs
 ```
 
 The formula downloads the prebuilt release for your OS and architecture
-(macOS/Linux, arm64/amd64), installs the binary into Homebrew's `bin`, and runs a
-`version` smoke test.
+(macOS/Linux, arm64/amd64), installs the binary into Homebrew's `bin`, and
+includes a `version` smoke test for `brew test`.
 
 Upgrade:
 
