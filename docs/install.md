@@ -194,7 +194,8 @@ Then remove the binary:
 ```bash
 # Homebrew
 brew uninstall opencode-jobs
-brew untap Martins6/tap
+# Optional: only if you no longer use other formulas from this tap.
+# brew untap Martins6/tap
 
 # Script or source install
 rm -f ~/.local/bin/opencode-jobs
