@@ -232,6 +232,14 @@ using `scripts/generate-homebrew-formula.sh` and pushes it when the
 workflow warns and skips the tap update; run the script manually and commit the
 formula.
 
+To enable automatic updates, create a token that can write to
+`Martins6/homebrew-tap` (a fine-grained token with **Contents: Read and write**
+is enough) and store it in the main repository:
+
+```bash
+gh secret set HOMEBREW_TAP_TOKEN -R Martins6/opencode-jobs
+```
+
 ## Troubleshooting installation
 
 **`opencode-jobs: command not found`**
