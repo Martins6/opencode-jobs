@@ -42,8 +42,15 @@ safe to run.
 
 ## Install script
 
+Prefer Homebrew or `go install`. The script is a fallback for machines without
+them. It runs with your user's authority, so download it, review it, and run it
+from a file. Do not pipe it into a shell.
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Martins6/opencode-jobs/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Martins6/opencode-jobs/main/install.sh \
+  -o /tmp/opencode-jobs-install.sh
+less /tmp/opencode-jobs-install.sh
+bash /tmp/opencode-jobs-install.sh
 ```
 
 The script:
@@ -54,20 +61,20 @@ The script:
 4. Installs to `~/.local/bin/opencode-jobs` (override with `--prefix`).
 5. Prints a PATH hint if the directory is not on `PATH`.
 
+The script verifies the release tarball. It does not verify itself; review it,
+or compare it with the copy in the repository before running.
+
 Examples:
 
 ```bash
 # Install a specific release
-curl -fsSL https://raw.githubusercontent.com/Martins6/opencode-jobs/main/install.sh \
-  | bash -s -- --version v0.1.0
+bash /tmp/opencode-jobs-install.sh --version v0.1.0
 
 # Latest rolling build from main (prerelease)
-curl -fsSL https://raw.githubusercontent.com/Martins6/opencode-jobs/main/install.sh \
-  | bash -s -- --main
+bash /tmp/opencode-jobs-install.sh --main
 
 # Custom location
-curl -fsSL https://raw.githubusercontent.com/Martins6/opencode-jobs/main/install.sh \
-  | bash -s -- --prefix "$HOME/bin"
+bash /tmp/opencode-jobs-install.sh --prefix "$HOME/bin"
 ```
 
 Environment equivalents:
@@ -75,7 +82,7 @@ Environment equivalents:
 ```bash
 OPENCODE_JOBS_VERSION=v0.1.0 \
 OPENCODE_JOBS_INSTALL_DIR="$HOME/bin" \
-  curl -fsSL https://raw.githubusercontent.com/Martins6/opencode-jobs/main/install.sh | bash
+  bash /tmp/opencode-jobs-install.sh
 ```
 
 ## Go install

@@ -7,7 +7,7 @@ does not require an OpenCode plugin.
 
 - OpenCode V2 with a working `opencode run`
 - macOS 12+ or Linux with systemd or cron
-- `curl` or `wget` for the script installer
+- `curl` or `wget` only if you use the script installer
 
 Verify OpenCode:
 
@@ -33,24 +33,30 @@ opencode-jobs reinstall --all
 
 ## Install script
 
+Prefer Homebrew or `go install`. The script is a fallback for machines without
+them. It runs with your user's authority, so download it, review it, and run it
+from a file. Do not pipe it into a shell.
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Martins6/opencode-jobs/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Martins6/opencode-jobs/main/install.sh \
+  -o /tmp/opencode-jobs-install.sh
+less /tmp/opencode-jobs-install.sh
+bash /tmp/opencode-jobs-install.sh
 ```
 
 The default prefix is `~/.local/bin`. The script verifies the release checksum.
+It does not verify itself; review it, or compare it with the copy in the
+repository before running.
 
 ```bash
 # Specific release
-curl -fsSL https://raw.githubusercontent.com/Martins6/opencode-jobs/main/install.sh \
-  | bash -s -- --version v0.1.0
+bash /tmp/opencode-jobs-install.sh --version v0.1.0
 
 # Latest main build
-curl -fsSL https://raw.githubusercontent.com/Martins6/opencode-jobs/main/install.sh \
-  | bash -s -- --main
+bash /tmp/opencode-jobs-install.sh --main
 
 # Custom prefix
-curl -fsSL https://raw.githubusercontent.com/Martins6/opencode-jobs/main/install.sh \
-  | bash -s -- --prefix "$HOME/bin"
+bash /tmp/opencode-jobs-install.sh --prefix "$HOME/bin"
 ```
 
 ## Go
