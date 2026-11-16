@@ -2,7 +2,10 @@
 
 # opencode-jobs installer for macOS and Linux.
 #
-#   curl -fsSL https://raw.githubusercontent.com/Martins6/opencode-jobs/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/Martins6/opencode-jobs/main/install.sh \
+#     -o /tmp/opencode-jobs-install.sh
+#   less /tmp/opencode-jobs-install.sh
+#   bash /tmp/opencode-jobs-install.sh
 #
 # Environment:
 #   OPENCODE_JOBS_VERSION      Release tag (default: latest stable)

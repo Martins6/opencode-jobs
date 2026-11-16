@@ -27,22 +27,28 @@ The tap installs a prebuilt binary for macOS and Linux on both arm64 and amd64.
 
 ### Install script
 
+Prefer Homebrew or `go install`. The script is a fallback for machines without
+them. Download it, review it, then run it from a file:
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Martins6/opencode-jobs/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Martins6/opencode-jobs/main/install.sh \
+  -o /tmp/opencode-jobs-install.sh
+less /tmp/opencode-jobs-install.sh
+bash /tmp/opencode-jobs-install.sh
 ```
 
 The script installs to `~/.local/bin` by default, verifies the release checksum,
-and prints a PATH hint when needed. Options:
+and prints a PATH hint when needed. It does not verify itself. Options:
 
 ```bash
 # Specific release
-curl -fsSL https://raw.githubusercontent.com/Martins6/opencode-jobs/main/install.sh | bash -s -- --version v0.1.0
+bash /tmp/opencode-jobs-install.sh --version v0.1.0
 
 # Latest build from main
-curl -fsSL https://raw.githubusercontent.com/Martins6/opencode-jobs/main/install.sh | bash -s -- --main
+bash /tmp/opencode-jobs-install.sh --main
 
 # Custom prefix
-curl -fsSL https://raw.githubusercontent.com/Martins6/opencode-jobs/main/install.sh | bash -s -- --prefix /usr/local/bin
+bash /tmp/opencode-jobs-install.sh --prefix /usr/local/bin
 ```
 
 ### Go
@@ -242,6 +248,12 @@ environment instead of a job prompt.
 
 - Job files, logs, run records, and locks are written with `0600` permissions
   inside a `0700` directory tree.
+- Scheduled jobs persist across reboots and run with your user's authority.
+  Review prompts before scheduling them and use the narrowest `--workdir`.
+- Jobs that read untrusted content (web pages, email, issues, API responses)
+  should use `--no-auto` and the delimiter rules in the skill's prompt guide.
+- Prefer Homebrew or `go install`. If you use the install script, download and
+  review it before running rather than piping it to a shell.
 - `--env` values are stored in the job file. Do not put long-lived secrets in a
   job unless you are comfortable with that file's permissions.
 - Scheduled runs execute with your user's authority. Only create jobs you would
